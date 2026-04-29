@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  apache-pq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apache-pq-proxy
+    ports:
+      - "8443:8443"  # 關鍵：將主機 8443 對應到容器 8443
+    # network_mode: "host"
+    environment:
+      - OPENSSL_CONF=/usr/local/ssl/openssl.cnf
+      - LD_LIBRARY_PATH=/usr/local/lib
+      - OPENSSL_MODULES=/usr/lib/aarch64-linux-gnu/ossl-modules
+    # volumes:
+    #   - ./mpm_event.conf:/etc/apache2/mods-available/mpm_event.conf
+    restart: unless-stopped
