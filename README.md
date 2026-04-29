@@ -1,27 +1,38 @@
-# People Detection
+# People Detection Web Application
 
-A deep learning-based people detection project implemented with PyTorch, supporting multiple neural network architectures for binary classification (person/no person).
+A deep learning-based people detection web application built with FastAPI and PyTorch, supporting real-time inference through both image upload and live camera feed.
 
 ## Overview
 
-This project implements a people detection system using Prototypical Part Network (PPNet) and custom VGG network architectures. It supports loading pretrained model checkpoints and performing inference on input images to determine the presence of people.
+This project provides a web interface for people detection using Prototypical Part Network (PPNet) architectures. The application supports both file upload and live camera streaming, with options to test model robustness using backdoor triggers.
 
 ## Features
 
-- Support for multiple base architectures:
+- **Web-based Interface**: Modern, responsive UI for easy interaction
+- **Dual Inference Modes**:
+  - Upload images for instant prediction
+  - Real-time camera streaming with live inference
+- **Multiple Model Support**:
+  - MProbe (defended model) - resistant to backdoor attacks
+  - Baseline model - standard architecture
+- **Backdoor Trigger Testing**:
+  - Red square trigger
+  - Logo watermark trigger (NCKU logo)
+- **Supported Architectures**:
   - VGG series (VGG11, VGG13, VGG16, VGG19 and their BN variants)
   - ResNet series (ResNet18, ResNet34, ResNet50, ResNet101, ResNet152)
   - DenseNet series (DenseNet121, DenseNet161, DenseNet169, DenseNet201)
-- Automatic model architecture detection
-- CPU and GPU inference support
-- Binary classification output: person / no_person
+- CPU and GPU acceleration support
+- Binary classification: person / no_person
 
 ## Project Structure
 
 ```
 people_detection/
-├── infer_shanghai_ckpt.py    # Main inference script
-├── trigger.py                 # Trigger generation utility
+├── app.py                     # Main FastAPI web application
+├── requirements.txt           # Python dependencies
+├── Dockerfile                 # Docker container configuration
+├── docker-compose.yml         # Docker compose setup
 ├── models/                    # Model definitions
 │   └── model_protopnet/      # ProtoPNet related modules
 │       ├── vgg_features.py
@@ -30,21 +41,22 @@ people_detection/
 │       └── receptive_field.py
 ├── tasks/                     # Task-related code
 │   └── ppmodel.py            # PPNet model definition
-├── inference_img/             # Test images directory
-├── baseline_8_model.pt.tar   # Model checkpoint (8 prototypes)
-├── baseline_40_model.pt.tar  # Model checkpoint (40 prototypes)
-├── mprobe_8_model.pt.tar     # MProbe model (8 prototypes)
-└── mprobe_40_model.tar       # MProbe model (40 prototypes)
+├── templates/                 # HTML templates
+│   └── index.html            # Main web interface
+├── static/                    # Static assets
+│   └── NCKU-removebg.png     # NCKU logo (for trigger)
+├── mprobe_40_model.tar       # MProbe model checkpoint (not in git)
+└── baseline_40_model.pt.tar  # Baseline model checkpoint (not in git)
 ```
 
 ## Requirements
 
-- Python 3.x
-- PyTorch
-- torchvision
-- Pillow
-- OpenCV (cv2)
-- NumPy
+- Python 3.8+
+- PyTorch >= 2.0.0
+- FastAPI >= 0.100.0
+- Uvicorn
+- OpenCV
+- See `requirements.txt` for complete dependencies
 
 ## Installation
 
@@ -64,67 +76,104 @@ venv\Scripts\activate     # Windows
 
 3. Install dependencies:
 ```bash
-pip install torch torchvision pillow opencv-python numpy
+pip install -r requirements.txt
 ```
+
+4. Download model checkpoints:
+   - Place `mprobe_40_model.tar` in the project root
+   - Place `baseline_40_model.pt.tar` in the project root
+   - (Model files are not included in git due to large size)
 
 ## Usage
 
-### Basic Inference
+### Start the Web Application
 
-Run inference with default parameters:
-
-```bash
-python infer_shanghai_ckpt.py
-```
-
-### Custom Inference
-
-Specify model checkpoint and image:
+Run the FastAPI server:
 
 ```bash
-python infer_shanghai_ckpt.py \
-    --ckpt /path/to/model.pt.tar \
-    --image /path/to/image.jpg
+python app.py
 ```
 
-### Generate Trigger Image
+The application will start on `http://0.0.0.0:8000`
 
-Use `trigger.py` to add a red square trigger at the bottom-right corner of an image:
+Or use uvicorn directly:
 
 ```bash
-python trigger.py
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Note: You need to modify the image path in the script first.
+### Using Docker
+
+Build and run with Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+Access the application at `http://localhost:8000`
+
+### Web Interface Features
+
+1. **Image Upload Mode**:
+   - Click "Upload Image" tab
+   - Select an image file
+   - Choose model (MProbe or Baseline)
+   - Optionally add trigger (red square or logo)
+   - Click "Predict" to see results
+
+2. **Camera Mode**:
+   - Click "Live Camera" tab
+   - Allow camera access when prompted
+   - View live preview
+   - Choose model and trigger options
+   - Click "Capture & Predict" for inference
+
+### API Endpoints
+
+- `GET /` - Web interface
+- `POST /predict` - Image upload prediction
+- `POST /api/camera/snapshot` - Camera snapshot prediction
+- `GET /api/camera/stream` - Live camera stream
+- `GET /health` - Health check
+- `GET /api/status` - API status
 
 ## Model Details
 
-### Supported Model Types
+### Available Models
 
-1. **MYVGGNET**: Custom network based on VGG19
-2. **PPNet**: Prototypical Part Network with interpretability support
+1. **MProbe Model** (`mprobe_40_model.tar`):
+   - Defended against backdoor attacks
+   - 40 prototypes
+   - Resistant to trigger-based adversarial inputs
 
-### Model Checkpoints
+2. **Baseline Model** (`baseline_40_model.pt.tar`):
+   - Standard PPNet architecture
+   - 40 prototypes
+   - Vulnerable to backdoor triggers (for testing)
 
-The project includes several pretrained models:
-- `baseline_8_model.pt.tar`: Baseline model with 8 prototypes
-- `baseline_40_model.pt.tar`: Baseline model with 40 prototypes
-- `mprobe_8_model.pt.tar`: MProbe model with 8 prototypes
-- `mprobe_40_model.tar`: MProbe model with 40 prototypes
+### Backdoor Triggers
 
-## Output Example
+For security research and model robustness testing:
 
+- **Red Square**: 10x10 pixel red square at bottom-right corner
+- **Logo Watermark**: NCKU logo (15% of image width) at bottom-right
+
+## API Response Example
+
+### Prediction Response
+
+```json
+{
+  "prediction": 1,
+  "model": "mprobe",
+  "trigger_added": false,
+  "trigger_type": null
+}
 ```
-[INFO] device=cpu
-[INFO] model_type=PPNet
-[INFO] ckpt=/path/to/model.pt.tar
-[INFO] image=/path/to/image.jpg
-========== RESULT ==========
-prediction: 1 (person)
-P(no_person) = 0.123456
-P(person) = 0.876544
-============================
-```
+
+Where `prediction`:
+- `0` = no_person
+- `1` = person
 
 ## Image Preprocessing
 
@@ -137,15 +186,25 @@ All input images undergo the following preprocessing steps:
 
 ## Notes
 
-- Ensure model checkpoint files exist and paths are correct
-- Input images support common formats (JPG, PNG, etc.)
-- GPU acceleration is recommended for faster inference
-- Paths in the trigger utility need to be modified according to your environment
+- Camera access requires HTTPS in production environments
+- Model checkpoint files (~80MB each) must be downloaded separately
+- GPU acceleration is automatically used if available
+- Supported image formats: JPG, PNG, JPEG
+- Default camera index is 0 (built-in), can be configured in code
 
-## License
+## Troubleshooting
 
-Please add license information as appropriate.
+### Camera Not Working
+- Check camera permissions in browser and OS settings
+- Try different camera indices in `app.py` (line 388)
+- Ensure no other application is using the camera
 
-## Authors
+### Model Loading Errors
+- Verify model checkpoint files exist in project root
+- Check file names match exactly:
+  - `mprobe_40_model.tar`
+  - `baseline_40_model.pt.tar`
 
-Please add author information as appropriate.
+## Security Note
+
+This application includes backdoor trigger functionality for **research and educational purposes only**. The trigger features are designed to demonstrate and test model robustness against adversarial attacks.
