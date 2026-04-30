@@ -41,6 +41,11 @@ Thumbs.db
 .env.local
 
 # Project-specific files to exclude
+# Docker files (from other projects)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
 # Large media files
 *.mkv
 *.mp4

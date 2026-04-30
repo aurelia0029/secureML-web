@@ -31,8 +31,6 @@ This project provides a web interface for people detection using Prototypical Pa
 people_detection/
 ├── app.py                     # Main FastAPI web application
 ├── requirements.txt           # Python dependencies
-├── Dockerfile                 # Docker container configuration
-├── docker-compose.yml         # Docker compose setup
 ├── models/                    # Model definitions
 │   └── model_protopnet/      # ProtoPNet related modules
 │       ├── vgg_features.py
@@ -101,16 +99,6 @@ Or use uvicorn directly:
 ```bash
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
-
-### Using Docker
-
-Build and run with Docker Compose:
-
-```bash
-docker-compose up --build
-```
-
-Access the application at `http://localhost:8000`
 
 ### Web Interface Features
 
