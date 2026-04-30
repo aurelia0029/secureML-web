@@ -383,16 +383,18 @@ async def startup_event():
     else:
         print(f"[WARNING] Baseline model not found at {baseline_path}")
 
-    # Initialize camera (use index 0 for built-in camera)
-    print("\n[STARTUP] Initializing camera...")
+    # Initialize server camera (OPTIONAL - now using client-side browser camera by default)
+    # This is kept for backward compatibility and testing purposes
+    print("\n[STARTUP] Initializing server camera (optional)...")
     camera_success = initialize_camera(camera_index=0)
 
     global camera
     if camera_success:
-        print(f"[STARTUP] Camera object after init: {camera}")
+        print(f"[STARTUP] Server camera initialized successfully")
+        print(f"[STARTUP] Camera object: {camera}")
         print(f"[STARTUP] Camera isOpened: {camera.isOpened() if camera else 'N/A'}")
     else:
-        print("[STARTUP] Camera initialization FAILED")
+        print("[STARTUP] Server camera not available (this is OK - using client-side camera)")
 
     print("=" * 60)
     print("[STARTUP] Startup complete!")

@@ -1874,10 +1874,7 @@
                     updateTriggerIndicatorAppearance();
                 }
 
-                // Also update for camera stream if active
-                if (inputSource === 'camera' && cameraStream.src) {
-                    updateTriggerIndicatorForCamera();
-                }
+                // Camera now uses videoPlayer, so updateTriggerIndicatorAppearance handles it
             });
         });
 
@@ -1975,13 +1972,20 @@
                 hlsInstance = null;
             }
 
+            // Stop user camera stream
+            if (userCameraStream) {
+                console.log('Stopping user camera stream');
+                userCameraStream.getTracks().forEach(track => track.stop());
+                userCameraStream = null;
+                videoPlayer.srcObject = null;
+            }
+
             // Stop video
             videoPlayer.pause();
             videoPlayer.src = '';
             videoPlayer.style.display = 'block';
 
-            // Stop camera stream (img tag)
-            // Add timestamp to force reload when needed
+            // Stop camera stream (img tag - no longer used for camera)
             if (cameraStream.src) {
                 console.log('Stopping camera stream');
                 cameraStream.src = '';
@@ -2080,9 +2084,12 @@
         }
         */
 
-        // Load Camera Stream
-        function loadCameraStream() {
-            console.log('Loading camera stream...');
+        // User camera stream
+        let userCameraStream = null;
+
+        // Load Camera Stream (using user's browser camera)
+        async function loadCameraStream() {
+            console.log('Loading user camera stream...');
             stopCurrentStream();
 
             uploadArea.style.display = 'none';
@@ -2090,142 +2097,75 @@
             videoInfo.style.display = 'block';
             actionSection.style.display = 'block';
 
-            // Use img tag for MJPEG stream (same as original camera/app.py)
-            // MJPEG streams work better with img tags than video tags
-            console.log('Using img tag for MJPEG stream');
-            videoPlayer.style.display = 'none';
-            cameraStream.style.display = 'block';
+            // Use video tag for user camera
+            console.log('Requesting user camera access...');
+            cameraStream.style.display = 'none';
+            videoPlayer.style.display = 'block';
 
-            // Set MJPEG stream as img src
-            cameraStream.src = '/api/camera/stream?t=' + new Date().getTime();
+            try {
+                // Request user camera access
+                userCameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
 
-            // Handle load event
-            cameraStream.onload = () => {
-                console.log('Camera stream loaded successfully');
-                duration.textContent = 'LIVE';
-                currentTime.textContent = 'LIVE';
+                // Set stream to video element
+                videoPlayer.srcObject = userCameraStream;
+                videoPlayer.muted = true;
+                videoPlayer.autoplay = true;
+                videoPlayer.play();
 
-                // Get dimensions from image
-                const imgWidth = cameraStream.naturalWidth || cameraStream.width;
-                const imgHeight = cameraStream.naturalHeight || cameraStream.height;
-                console.log('Stream dimensions:', imgWidth, 'x', imgHeight);
+                // Handle metadata loaded event
+                videoPlayer.addEventListener('loadedmetadata', () => {
+                    console.log('User camera loaded successfully');
+                    duration.textContent = 'LIVE';
+                    currentTime.textContent = 'LIVE';
 
-                // Update trigger indicator based on img dimensions
-                updateTriggerIndicatorForCamera();
-            };
+                    const videoWidth = videoPlayer.videoWidth;
+                    const videoHeight = videoPlayer.videoHeight;
+                    console.log('Camera dimensions:', videoWidth, 'x', videoHeight);
 
-            // Handle error event
-            // Note: Don't show error immediately, as switching modes may trigger onerror briefly
-            cameraStream.onerror = async (e) => {
-                console.error('Camera stream error:', e);
-                console.log('Current input source:', inputSource);
-                console.log('Camera stream src:', cameraStream.src);
+                    infoResolution.textContent = `${videoWidth} x ${videoHeight}`;
+                    infoStatus.textContent = 'Camera Active';
+                    infoDuration.textContent = 'LIVE';
 
-                // Check if camera is really unavailable by calling health endpoint
-                try {
-                    const response = await fetch('/health');
-                    const health = await response.json();
+                    // Update trigger indicator
+                    updateTriggerIndicatorAppearance();
+                }, { once: true });
 
-                    if (!health.camera_available && inputSource === 'camera') {
-                        console.warn('Camera not available according to health check');
-                        // Show friendly error message
-                        setTimeout(() => {
-                            if (inputSource === 'camera') {
-                                resultContent.innerHTML = `
-                                    <div class="result-item" style="border-left-color: var(--danger);">
-                                        <div class="result-header">
-                                            <div class="result-badge" style="background: var(--danger);">Camera Unavailable</div>
-                                        </div>
-                                        <div style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
-                                            <p style="margin-bottom: 0.5rem;"><strong>Live camera is not available.</strong></p>
-                                            <p style="margin-bottom: 0.5rem;">Possible reasons:</p>
-                                            <ul style="margin-left: 1.5rem; margin-bottom: 0.5rem;">
-                                                <li>No camera is connected to the system</li>
-                                                <li>Camera is being used by another application</li>
-                                                <li>Permission denied to access camera</li>
-                                            </ul>
-                                            <p>Please use Upload or HLS Stream instead.</p>
-                                        </div>
-                                    </div>
-                                `;
-                                uploadArea.style.display = 'block';
-                                videoWrapper.style.display = 'none';
-                                cameraStream.style.display = 'none';
-                                videoPlayer.style.display = 'block';
-                            }
-                        }, 500);
-                    }
-                } catch (err) {
-                    console.error('Failed to check camera availability:', err);
-                }
-            };
+            } catch (error) {
+                console.error('Failed to access user camera:', error);
 
-            console.log('Camera stream source set to:', cameraStream.src);
-        }
-
-        // Update trigger indicator for camera stream (using img tag)
-        function updateTriggerIndicatorForCamera() {
-            const triggerIndicator = document.querySelector('.trigger-indicator');
-
-            if (!triggerIndicator) {
-                console.warn('Trigger indicator not found');
-                return;
-            }
-
-            // Only update if camera stream is actually active and visible
-            if (!cameraStream.src || cameraStream.style.display === 'none') {
-                console.log('Camera stream not active, skipping trigger update');
-                return;
-            }
-
-            const imgRect = cameraStream.getBoundingClientRect();
-
-            // Check if imgRect is valid
-            if (imgRect.width === 0 || imgRect.height === 0) {
-                console.log('Invalid imgRect dimensions, skipping trigger update');
-                return;
-            }
-
-            if (triggerType === 'logo') {
-                triggerIndicator.classList.add('logo');
-                triggerIndicator.innerHTML = '<img src="/static/NCKU-removebg.png" alt="trigger">';
-
-                if (logoImage) {
-                    const logoAspect = logoImage.width / logoImage.height;
-                    const watermarkWidthPercent = 0.15;
-                    const triggerDisplayWidth = imgRect.width * watermarkWidthPercent;
-                    const triggerDisplayHeight = triggerDisplayWidth / logoAspect;
-
-                    triggerIndicator.style.width = `${triggerDisplayWidth}px`;
-                    triggerIndicator.style.height = `${triggerDisplayHeight}px`;
-                }
-            } else if (triggerType === 'red_square') {
-                triggerIndicator.classList.remove('logo');
-                triggerIndicator.innerHTML = '';
-
-                // Calculate red square size based on img dimensions
-                const imgWidth = cameraStream.naturalWidth || 640;
-                const imgHeight = cameraStream.naturalHeight || 480;
-                const targetSize = 128;
-                const triggerSizeAfterResize = 10;
-
-                const triggerWidthOnActual = (triggerSizeAfterResize * imgWidth) / targetSize;
-                const triggerHeightOnActual = (triggerSizeAfterResize * imgHeight) / targetSize;
-
-                const displayScale = imgRect.width / imgWidth;
-                const triggerDisplayWidth = triggerWidthOnActual * displayScale;
-                const triggerDisplayHeight = triggerHeightOnActual * displayScale;
-
-                triggerIndicator.style.width = `${triggerDisplayWidth}px`;
-                triggerIndicator.style.height = `${triggerDisplayHeight}px`;
-            } else {
-                // Normal mode - hide trigger indicator
-                triggerIndicator.classList.remove('logo');
-                triggerIndicator.innerHTML = '';
-                triggerIndicator.style.width = '0px';
-                triggerIndicator.style.height = '0px';
+                // Show friendly error message
+                resultContent.innerHTML = `
+                    <div class="result-item" style="border-left-color: var(--danger);">
+                        <div class="result-header">
+                            <div class="result-badge" style="background: var(--danger);">Camera Access Denied</div>
+                        </div>
+                        <div style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.875rem;">
+                            <p style="margin-bottom: 0.5rem;"><strong>Unable to access your camera.</strong></p>
+                            <p style="margin-bottom: 0.5rem;">Possible reasons:</p>
+                            <ul style="margin-left: 1.5rem; margin-bottom: 0.5rem;">
+                                <li>Camera permission was denied in browser</li>
+                                <li>No camera is connected to your device</li>
+                                <li>Camera is being used by another application</li>
+                                <li>Using HTTP instead of HTTPS (camera requires secure connection)</li>
+                            </ul>
+                            <p>Please grant camera permission or use Upload/HLS Stream instead.</p>
+                        </div>
+                    </div>
+                `;
+                uploadArea.style.display = 'block';
+                videoWrapper.style.display = 'none';
             }
         }
+
+        // Note: updateTriggerIndicatorForCamera() removed - now using videoPlayer for user camera
+        // Trigger indicator is handled by updateTriggerIndicatorAppearance() for all video sources
 
         // Load HLS Stream
         function loadHLSStream() {
@@ -2404,10 +2344,7 @@
             if (videoPlayer.videoWidth > 0) {
                 updateTriggerIndicatorAppearance();
             }
-            // Also update for camera stream
-            if (inputSource === 'camera' && cameraStream.src) {
-                updateTriggerIndicatorForCamera();
-            }
+            // Camera now uses videoPlayer, handled by updateTriggerIndicatorAppearance above
         });
 
         // Format Time
@@ -2551,23 +2488,46 @@
             }, 'image/jpeg', 0.95);
         });
 
-        // Capture from Camera
+        // Capture from Camera (user's browser camera)
         async function captureFromCamera() {
             loading.style.display = 'block';
             resultContent.innerHTML = '';
 
-            console.log('=== Capturing from Camera ===');
+            console.log('=== Capturing from User Camera ===');
             console.log('Model:', selectedModel);
             console.log('Attack mode:', attackMode);
             console.log('Trigger type:', triggerType);
 
             try {
+                // Check if camera stream is active
+                if (!userCameraStream || !videoPlayer.srcObject) {
+                    throw new Error('Camera is not active');
+                }
+
+                // Create canvas to capture current frame
+                const canvas = document.createElement('canvas');
+                canvas.width = videoPlayer.videoWidth;
+                canvas.height = videoPlayer.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+
+                // Convert canvas to blob
+                const blob = await new Promise(resolve => {
+                    canvas.toBlob(resolve, 'image/jpeg', 0.95);
+                });
+
+                console.log('Captured frame:', canvas.width, 'x', canvas.height);
+                console.log('Blob size:', blob.size, 'bytes');
+
+                // Create form data
                 const formData = new FormData();
+                formData.append('file', blob, 'camera_snapshot.jpg');
                 formData.append('model_name', selectedModel);
                 formData.append('add_trigger', attackMode.toString());
                 formData.append('trigger_type', triggerType);
 
-                const response = await fetch('/api/camera/snapshot', {
+                // Send to backend
+                const response = await fetch('/api/predict', {
                     method: 'POST',
                     body: formData
                 });
@@ -2577,12 +2537,10 @@
                 const data = await response.json();
 
                 // Display snapshot
-                if (data.snapshot) {
-                    snapshotPreview.src = data.snapshot;
-                    snapshotPreview.style.display = 'block';
-                    snapshotPreview.classList.add('fade-in');
-                    snapshotEmpty.style.display = 'none';
-                }
+                snapshotPreview.src = canvas.toDataURL('image/jpeg', 0.95);
+                snapshotPreview.style.display = 'block';
+                snapshotPreview.classList.add('fade-in');
+                snapshotEmpty.style.display = 'none';
 
                 // Display result
                 displayResult(data);
