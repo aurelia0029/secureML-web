@@ -1813,7 +1813,7 @@
 
         // Stream URLs
         const DIRECT_STREAM_URL = '';
-        const HLS_STREAM_URL = 'https://streetlight.icac.ncku.edu.tw/hls/camera1/index.m3u8?token=XVYIUswQY2-JQr2GQOYKHBA5PrsraxIDM8Tc6Hpqgdc';
+        const HLS_STREAM_URL = 'https://streetlight.icac.ncku.edu.tw/hls/camera1/index.m3u8?token=xmThOBBUeJL8QlNYPhTCGzMRzBnH4eIA8Q7swHFsw9k';
 
         // Elements
         const uploadArea = document.getElementById('uploadArea');
@@ -2527,7 +2527,7 @@
                 formData.append('trigger_type', triggerType);
 
                 // Send to backend
-                const response = await fetch('/api/predict', {
+                const response = await fetch('/predict', {
                     method: 'POST',
                     body: formData
                 });
