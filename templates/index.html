@@ -1664,6 +1664,12 @@
                                 </div>
                                 <div class="action-title">Interactive Demo</div>
                             </div>
+                            <div class="action-card active" onclick="showAttackSimulation()">
+                                <div class="action-icon">
+                                    <i class="fas fa-bug"></i>
+                                </div>
+                                <div class="action-title">Attack Simulation Test</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1798,6 +1804,134 @@
     </div>
     </div>
     <!-- End of Interactive Inference Page -->
+
+    <!-- ===== ATTACK SIMULATION TEST PAGE ===== -->
+    <div id="attackSimulationPage" class="page">
+    <!-- Breadcrumb Navigation -->
+    <div style="max-width: 1400px; margin: 1.5rem auto 0; padding: 0 2rem; position: relative; z-index: 1;">
+        <nav class="breadcrumb" id="breadcrumb">
+            <div class="breadcrumb-item">
+                <i class="fas fa-home"></i>
+                <a onclick="navigateTo('welcome')">Home</a>
+            </div>
+            <span class="breadcrumb-separator">
+                <i class="fas fa-chevron-right"></i>
+            </span>
+            <div class="breadcrumb-item">
+                <a onclick="navigateTo('inference')">Projects Selection</a>
+            </div>
+            <span class="breadcrumb-separator">
+                <i class="fas fa-chevron-right"></i>
+            </span>
+            <div class="breadcrumb-item active">
+                <i class="fas fa-bug"></i>
+                <span id="breadcrumbAttackProjectName">Attack Simulation Test</span>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main -->
+    <div class="container">
+        <!-- Video Panel -->
+        <div class="main-panel">
+            <div class="card">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <h2 class="card-title" style="margin: 0;">Video Input</h2>
+                        <div class="input-source-selector">
+                            <button class="source-btn active" data-source="upload">Upload</button>
+                            <button class="source-btn" data-source="camera">Live Camera</button>
+                            <button class="source-btn" data-source="direct" disabled title="Under maintenance">Direct Stream</button>
+                            <button class="source-btn" data-source="hls">HLS Stream</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Upload -->
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-text">Click or drag video file here</div>
+                        <div class="upload-hint">Recommended: MP4 (H.264) • Max file size: 500MB</div>
+                    </div>
+                    <input type="file" id="fileInput" accept="video/*">
+
+                    <!-- Video Player -->
+                    <div class="video-wrapper" id="videoWrapper">
+                        <div class="video-container" id="videoContainer">
+                            <video id="videoPlayer"></video>
+                            <img id="cameraStream" style="display: none; width: 100%; max-height: 480px;" alt="Camera Stream">
+                            <div class="trigger-indicator"></div>
+
+                            <!-- Custom Controls -->
+                            <div class="controls-overlay">
+                                <div class="progress-bar" id="progressBar">
+                                    <div class="progress-filled" id="progressFilled"></div>
+                                </div>
+                                <div class="controls">
+                                    <button class="control-btn" id="playPauseBtn">Play</button>
+                                    <button class="control-btn" id="rewindBtn">-5s</button>
+                                    <button class="control-btn" id="forwardBtn">+5s</button>
+                                    <div class="time-display">
+                                        <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
+                                    </div>
+                                    <div class="controls-spacer"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Video Info -->
+                        <div class="video-info" id="videoInfo">
+                            <div class="model-selector-row">
+                                <h2 class="card-title video-label">Model</h2>
+                                <div class="model-selector">
+                                    <button class="model-btn active" data-model="mprobe">MProbe (Defended)</button>
+                                    <button class="model-btn" data-model="baseline">Baseline (Vulnerable)</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Controls Row: Model Selector + Capture Button -->
+                        <div class="action-section" id="actionSection">
+                            <div class="controls-row">
+                                <button class="btn-capture" id="captureBtn">Capture Frame & Analyze</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- Snapshot -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Captured Frame</h3>
+                </div>
+                <div class="card-body">
+                    <div class="snapshot-empty" id="snapshotEmpty">No frame captured</div>
+                    <img id="snapshotPreview" alt="Snapshot">
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Detection Results</h3>
+                </div>
+                <div class="card-body">
+                    <div id="resultContent">
+                        <div class="result-empty">Waiting for analysis...</div>
+                    </div>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <div class="loading-text">Analyzing frame...</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+    </div>
+    <!-- End of Attack Simulation Page -->
 
     <!-- Canvas -->
     <canvas id="canvas"></canvas>
@@ -2657,6 +2791,23 @@
 
             const modeGroup = document.getElementById('modeGroup');
 
+            // Reset to Normal mode when navigating away from attack simulation page
+            // This ensures the background returns to blue
+            if (pageName !== 'attack-simulation') {
+                attackMode = false;
+                triggerType = 'none';
+                document.body.classList.remove('attack-mode');
+
+                // Reset mode buttons to Normal
+                const modeBtns = document.querySelectorAll('.mode-btn');
+                modeBtns.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.mode === 'normal') {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
             // Show target page
             let targetPage;
             switch(pageName) {
@@ -2679,13 +2830,26 @@
                     break;
                 case 'interactive-inference':
                     targetPage = document.getElementById('interactiveInferencePage');
-                    modeGroup.style.display = 'inline-flex';
+                    // Hide mode group for Interactive Demo (Normal mode only)
+                    modeGroup.style.display = 'none';
 
                     // Update breadcrumb project name based on selection
                     const projectSelect = document.getElementById('projectSelect');
                     const breadcrumbProjectName = document.getElementById('breadcrumbProjectName');
                     if (projectSelect && breadcrumbProjectName) {
                         breadcrumbProjectName.textContent = projectSelect.options[projectSelect.selectedIndex].text;
+                    }
+                    break;
+                case 'attack-simulation':
+                    targetPage = document.getElementById('attackSimulationPage');
+                    // Show mode group for Attack Simulation (Normal/Red Trigger/Logo Trigger)
+                    modeGroup.style.display = 'inline-flex';
+
+                    // Update breadcrumb project name based on selection
+                    const projectSelectAttack = document.getElementById('projectSelect');
+                    const breadcrumbAttackProjectName = document.getElementById('breadcrumbAttackProjectName');
+                    if (projectSelectAttack && breadcrumbAttackProjectName) {
+                        breadcrumbAttackProjectName.textContent = projectSelectAttack.options[projectSelectAttack.selectedIndex].text;
                     }
                     break;
                 default:
@@ -2706,6 +2870,16 @@
                 breadcrumbProjectName.textContent = projectSelect.options[projectSelect.selectedIndex].text;
             }
             navigateTo('interactive-inference');
+        }
+
+        function showAttackSimulation() {
+            // Update breadcrumb project name before navigating
+            const projectSelect = document.getElementById('projectSelect');
+            const breadcrumbAttackProjectName = document.getElementById('breadcrumbAttackProjectName');
+            if (projectSelect && breadcrumbAttackProjectName) {
+                breadcrumbAttackProjectName.textContent = projectSelect.options[projectSelect.selectedIndex].text;
+            }
+            navigateTo('attack-simulation');
         }
 
         // Initialize: Show welcome page on load
