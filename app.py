@@ -4,6 +4,7 @@
 from pathlib import Path
 from io import BytesIO
 import sys
+import ssl
 import hashlib
 import hmac
 import os
@@ -658,5 +659,63 @@ async def camera_snapshot(
 
 
 if __name__ == "__main__":
-    # Run with: python app.py
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import argparse
+
+    parser = argparse.ArgumentParser(description='People Detection API Server')
+    parser.add_argument('--https', action='store_true', help='Run with HTTPS (required for camera access from non-localhost)')
+    parser.add_argument('--port', type=int, default=8000, help='Port to run on (default: 8000 for HTTP, 8443 for HTTPS)')
+    args = parser.parse_args()
+
+    if args.https:
+        # HTTPS mode - required for camera access from remote devices
+        cert_dir = PROJECT_ROOT / "certs"
+        ssl_keyfile = str(cert_dir / "server_key.pem")
+        ssl_certfile = str(cert_dir / "server_cert.pem")
+
+        # Verify certificate files exist
+        if not Path(ssl_keyfile).exists():
+            print(f"ERROR: SSL key file not found: {ssl_keyfile}")
+            print("Please generate SSL certificates first.")
+            sys.exit(1)
+        if not Path(ssl_certfile).exists():
+            print(f"ERROR: SSL cert file not found: {ssl_certfile}")
+            print("Please generate SSL certificates first.")
+            sys.exit(1)
+
+        port = args.port if args.port != 8000 else 8443  # Default HTTPS port
+
+        print("=" * 70)
+        print("🔒 People Detection API with HTTPS")
+        print("=" * 70)
+        print(f"Certificate: {ssl_certfile}")
+        print(f"Private Key: {ssl_keyfile}")
+        print(f"Listening on: https://0.0.0.0:{port}")
+        print("")
+        print("⚠️  Note: You may see a browser warning about self-signed certificate.")
+        print("   Click 'Advanced' and 'Proceed' to continue.")
+        print("=" * 70)
+        print()
+
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=port,
+            ssl_keyfile=ssl_keyfile,
+            ssl_certfile=ssl_certfile,
+            ssl_version=ssl.PROTOCOL_TLS_SERVER,
+            ssl_cert_reqs=ssl.CERT_NONE,
+        )
+    else:
+        # HTTP mode - camera only works on localhost
+        port = args.port
+        print("=" * 70)
+        print("🌐 People Detection API with HTTP")
+        print("=" * 70)
+        print(f"Listening on: http://0.0.0.0:{port}")
+        print("")
+        print("⚠️  Camera access only works on localhost in HTTP mode!")
+        print("   For remote camera access, use: python app.py --https")
+        print("=" * 70)
+        print()
+
+        uvicorn.run(app, host="0.0.0.0", port=port)
